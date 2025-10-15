@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "efresh": {
+      "type": "stdio",
+      "command": "/full/path/to/.venv/bin/python",
+      "args": ["-m", "efresh_server"],
+      "env": {
+        "EFRESH_EMAIL": "your-email@example.com",
+        "EFRESH_PASSWORD": "your-password"
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  efresh-server:
+    build: .
+    container_name: efresh-mcp-server
+    ports:
+      - "8000:8000"
+    environment:
+      # Set your e-fresh.gr credentials here
+      - EFRESH_EMAIL=${EFRESH_EMAIL}
+      - EFRESH_PASSWORD=${EFRESH_PASSWORD}
+    volumes:
+      # Mount session file for persistence
+      - ~/.efresh_session.json:/root/.efresh_session.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

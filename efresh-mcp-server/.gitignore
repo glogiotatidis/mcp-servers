@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Credentials and session data
+.env
+.env.local
+.env.*.local
+*.session.json
+.efresh_session.json
+
+# HAR files may contain credentials
+*.har
+
+# Config files with credentials
+claude-code-config.json
+cursor-config.json
+
+# Test and debug files
+test_*.py
+debug_*.py
+test_*.sh
+investigate_*.py
+
+# OS
+.DS_Store
+Thumbs.db
