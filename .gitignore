@@ -45,6 +45,10 @@ htmlcov/
 *.session.json
 .efresh_session.json
 
+# Docker compose (use .example.yml templates)
+docker-compose.yml
+docker-compose.override.yml
+
 # HAR files may contain credentials
 *.har
 
