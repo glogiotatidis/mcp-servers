@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  skroutz-http:
+    build: .
+    container_name: skroutz-mcp-http
+    command: ["python", "-m", "skroutz_server.cli", "--mode", "http", "--host", "0.0.0.0", "--port", "8000"]
+    env_file:
+      - .env
+    environment:
+      - SKROUTZ_EMAIL=${SKROUTZ_EMAIL}
+      - SKROUTZ_PASSWORD=${SKROUTZ_PASSWORD}
+    volumes:
+      - session-data:/home/skroutz/.skroutz-mcp
+    ports:
+      - "8000:8000"
+
+volumes:
+  session-data:
+
