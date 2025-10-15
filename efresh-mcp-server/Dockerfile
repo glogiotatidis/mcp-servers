@@ -1,6 +1,16 @@
 # Use Python 3.12 slim image
 FROM python:3.12-slim
 
+# Install Node.js and npm for mcp-proxy
+RUN apt-get update && apt-get install -y \
+    nodejs \
+    npm \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install mcp-proxy globally
+RUN npm install -g @chrishayuk/mcp-proxy
+
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -16,11 +26,11 @@ RUN uv sync --frozen --no-dev
 # Copy application code
 COPY efresh_server ./efresh_server
 
-# Expose port for HTTP mode
-EXPOSE 8000
+# Expose port for mcp-proxy SSE endpoint
+EXPOSE 8081
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-# Default command (can be overridden in docker-compose)
-CMD ["uv", "run", "python", "-m", "efresh_server.cli", "--mode", "http", "--host", "0.0.0.0", "--port", "8000"]
+# Default command runs mcp-proxy wrapping the stdio MCP server
+CMD ["mcp-proxy", "--stdio", "uv run python -m efresh_server", "--port", "8081", "--host", "0.0.0.0"]

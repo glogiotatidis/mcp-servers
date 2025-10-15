@@ -1,13 +1,11 @@
-"""HTTP server for E-Fresh MCP Server with SSE support."""
+"""HTTP server for E-Fresh MCP Server."""
 
-import asyncio
 import logging
-import json
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .auth import AuthManager
@@ -89,23 +87,22 @@ async def root():
         "name": "E-Fresh MCP Server",
         "version": "0.1.0",
         "description": "HTTP API for interacting with e-fresh.gr grocery store",
-        "mcp_compatible": True,
-        "home_assistant_compatible": True,
+        "mcp_stdio": "python -m efresh_server",
+        "home_assistant_setup": {
+            "note": "Use mcp-proxy to wrap the stdio MCP server for Home Assistant",
+            "install": "npm install -g @chrishayuk/mcp-proxy",
+            "command": "mcp-proxy --stdio 'python -m efresh_server' --port 8081",
+            "sse_endpoint": "http://localhost:8081/sse",
+            "reference": "https://www.home-assistant.io/integrations/mcp/"
+        },
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
-            "sse": "/sse - SSE endpoint for Home Assistant MCP integration",
             "auth": {"login": "POST /auth/login", "logout": "POST /auth/logout", "status": "GET /auth/status"},
             "products": {"search": "POST /products/search"},
             "cart": {"get": "GET /cart", "add": "POST /cart/add", "remove": "POST /cart/remove"},
             "orders": {"list": "POST /orders"},
             "settings": {"language": "POST /settings/language", "get_language": "GET /settings/language"}
-        },
-        "home_assistant_setup": {
-            "recommended": "Use mcp-proxy for full MCP protocol support",
-            "mcp_proxy_install": "npm install -g @chrishayuk/mcp-proxy",
-            "mcp_proxy_command": "mcp-proxy --stdio 'python -m efresh_server' --port 8081",
-            "sse_url": "http://localhost:8081/sse"
         },
         "authenticated": auth_manager.is_authenticated() if auth_manager else False
     }
@@ -387,124 +384,7 @@ async def list_mcp_tools():
     }
 
 
-# SSE endpoint for Home Assistant MCP integration
-@app.get("/sse")
-async def sse_endpoint(request: Request):
-    """
-    Server-Sent Events (SSE) endpoint for MCP protocol compatibility.
-
-    This endpoint provides SSE stream compatible with Home Assistant MCP integration.
-    For full MCP protocol support, it's recommended to use mcp-proxy tool.
-
-    To use with Home Assistant:
-    1. Install mcp-proxy: npm install -g @chrishayuk/mcp-proxy
-    2. Run: mcp-proxy --stdio "python -m efresh_server" --port 8080
-    3. Configure Home Assistant with: http://localhost:8080/sse
-
-    Reference: https://www.home-assistant.io/integrations/mcp/
-    """
-
-    async def event_stream():
-        """Generate SSE keepalive stream."""
-        try:
-            logger.info("SSE client connected for MCP")
-
-            # Send server info event
-            info = {
-                "type": "info",
-                "server": "efresh-mcp-server",
-                "version": "0.1.0",
-                "transport": "sse",
-                "note": "For full MCP protocol support, use mcp-proxy to wrap the stdio server",
-                "stdio_command": "python -m efresh_server",
-                "mcp_proxy_usage": "mcp-proxy --stdio 'python -m efresh_server' --port 8080"
-            }
-            yield f"data: {json.dumps(info)}\n\n"
-
-            # Keep connection alive
-            while True:
-                if await request.is_disconnected():
-                    logger.info("SSE client disconnected")
-                    break
-
-                # Send keepalive ping every 30 seconds
-                yield ": ping\n\n"
-                await asyncio.sleep(30)
-
-        except asyncio.CancelledError:
-            logger.info("SSE stream cancelled")
-        except Exception as e:
-            logger.error(f"SSE error: {e}", exc_info=True)
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": "*",
-        }
-    )
-
-
-# SSE endpoint for Home Assistant MCP integration
-@app.get("/sse")
-async def sse_endpoint(request: Request):
-    """
-    Server-Sent Events (SSE) endpoint for MCP protocol compatibility.
-
-    For Home Assistant MCP integration support.
-    Use mcp-proxy tool for full MCP protocol support.
-
-    Reference: https://www.home-assistant.io/integrations/mcp/
-    """
-
-    async def event_stream():
-        """Generate SSE keepalive stream."""
-        try:
-            logger.info("SSE client connected for MCP")
-
-            # Send server info event
-            info = {
-                "type": "info",
-                "server": "efresh-mcp-server",
-                "version": "0.1.0",
-                "transport": "sse",
-                "note": "For full MCP protocol support, use mcp-proxy to wrap the stdio server",
-                "stdio_command": "python -m efresh_server",
-                "mcp_proxy_usage": "mcp-proxy --stdio 'python -m efresh_server' --port 8081"
-            }
-            yield f"data: {json.dumps(info)}\n\n"
-
-            # Keep connection alive
-            while True:
-                if await request.is_disconnected():
-                    logger.info("SSE client disconnected")
-                    break
-
-                # Send keepalive ping every 30 seconds
-                yield ": ping\n\n"
-                await asyncio.sleep(30)
-
-        except asyncio.CancelledError:
-            logger.info("SSE stream cancelled")
-        except Exception as e:
-            logger.error(f"SSE error: {e}", exc_info=True)
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": "*",
-        }
-    )
-
-
-def run_http_server(host: str = "0.0.0.0", port: int = 8000):
+def run_http_server(host: str = "0.0.0.0", port: int = 8001, reload: bool = False):
     """Run the HTTP server."""
     import uvicorn
 

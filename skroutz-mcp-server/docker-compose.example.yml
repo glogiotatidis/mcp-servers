@@ -1,10 +1,11 @@
 version: '3.8'
 
 services:
-  skroutz-http:
+  skroutz-mcp-proxy:
     build: .
-    container_name: skroutz-mcp-http
-    command: ["python", "-m", "skroutz_server.cli", "--mode", "http", "--host", "0.0.0.0", "--port", "8000"]
+    container_name: skroutz-mcp-server
+    # Run mcp-proxy wrapping the stdio MCP server for Home Assistant compatibility
+    command: ["mcp-proxy", "--stdio", "python -m skroutz_server", "--port", "8080", "--host", "0.0.0.0"]
     env_file:
       - .env
     environment:
@@ -13,7 +14,14 @@ services:
     volumes:
       - session-data:/home/skroutz/.skroutz-mcp
     ports:
-      - "8000:8000"
+      - "8080:8080"  # SSE endpoint for Home Assistant
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   session-data:

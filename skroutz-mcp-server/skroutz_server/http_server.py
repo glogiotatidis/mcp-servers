@@ -1,14 +1,11 @@
-"""HTTP server for Skroutz MCP Server with hot reloading support and SSE."""
+"""HTTP server for Skroutz MCP Server with hot reloading support."""
 
 import logging
 import os
-import json
-import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from .auth import AuthManager
@@ -102,12 +99,17 @@ async def root():
         "name": "Skroutz MCP Server",
         "version": "0.1.0",
         "description": "HTTP API for interacting with skroutz.gr e-commerce store",
-        "mcp_compatible": True,
-        "home_assistant_compatible": True,
+        "mcp_stdio": "python -m skroutz_server",
+        "home_assistant_setup": {
+            "note": "Use mcp-proxy to wrap the stdio MCP server for Home Assistant",
+            "install": "npm install -g @chrishayuk/mcp-proxy",
+            "command": "mcp-proxy --stdio 'python -m skroutz_server' --port 8080",
+            "sse_endpoint": "http://localhost:8080/sse",
+            "reference": "https://www.home-assistant.io/integrations/mcp/"
+        },
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
-            "sse": "/sse - SSE endpoint for Home Assistant MCP integration",
             "auth": {
                 "login": "POST /auth/login",
                 "logout": "POST /auth/logout",
@@ -348,71 +350,6 @@ async def get_order_details(order_id: str):
     except Exception as e:
         logger.error(f"Get order details error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# SSE endpoint for Home Assistant MCP integration
-# Note: This is a simplified SSE endpoint. For full MCP SSE support,
-# use the mcp-proxy tool to wrap the stdio server.
-@app.get("/sse")
-async def sse_endpoint(request: Request):
-    """
-    Server-Sent Events (SSE) endpoint for MCP protocol compatibility.
-
-    This endpoint provides a simple SSE stream that Home Assistant can connect to.
-    For full MCP protocol support with Home Assistant, it's recommended to use
-    an MCP proxy like mcp-proxy (https://github.com/chrishayuk/mcp-proxy) which
-    properly bridges stdio MCP servers to SSE.
-
-    To use with Home Assistant:
-    1. Install mcp-proxy: npm install -g @chrishayuk/mcp-proxy
-    2. Run: mcp-proxy --stdio "python -m skroutz_server" --port 8080
-    3. Configure Home Assistant with: http://localhost:8080/sse
-
-    Reference: https://www.home-assistant.io/integrations/mcp/
-    """
-
-    async def event_stream():
-        """Generate SSE keepalive stream."""
-        try:
-            logger.info("SSE client connected for MCP")
-
-            # Send endpoint info event
-            info = {
-                "type": "info",
-                "server": "skroutz-mcp-server",
-                "version": "0.1.0",
-                "transport": "sse",
-                "note": "For full MCP protocol support, use mcp-proxy to wrap the stdio server",
-                "stdio_command": "python -m skroutz_server",
-                "mcp_proxy_usage": "mcp-proxy --stdio 'python -m skroutz_server' --port 8080"
-            }
-            yield f"data: {json.dumps(info)}\n\n"
-
-            # Keep connection alive
-            while True:
-                if await request.is_disconnected():
-                    logger.info("SSE client disconnected")
-                    break
-
-                # Send keepalive ping every 30 seconds
-                yield ": ping\n\n"
-                await asyncio.sleep(30)
-
-        except asyncio.CancelledError:
-            logger.info("SSE stream cancelled")
-        except Exception as e:
-            logger.error(f"SSE error: {e}", exc_info=True)
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": "*",
-        }
-    )
 
 
 def run_http_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = False):

@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  efresh-server:
+  efresh-mcp-proxy:
     build: .
     container_name: efresh-mcp-server
-    ports:
-      - "8000:8000"
+    # Run mcp-proxy wrapping the stdio MCP server for Home Assistant compatibility
+    # Note: The default CMD in Dockerfile already runs mcp-proxy
     env_file:
       - .env
     environment:
@@ -14,9 +14,11 @@ services:
     volumes:
       # Use named volume for session persistence
       - session-data:/root/.efresh-mcp
+    ports:
+      - "8081:8081"  # SSE endpoint for Home Assistant
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
       timeout: 10s
       retries: 3
