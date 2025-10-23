@@ -1,7 +1,8 @@
-"""Entry point for running the Sklavenitis MCP server as a module."""
+"""Main entry point."""
 
 import asyncio
 from .server import main
 
 if __name__ == "__main__":
     asyncio.run(main())
+

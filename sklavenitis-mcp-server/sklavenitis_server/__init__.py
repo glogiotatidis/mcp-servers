@@ -1,3 +1,4 @@
-"""MCP Server for Sklavenitis.gr grocery store."""
+"""Sklavenitis MCP Server."""
 
 __version__ = "0.1.0"
+

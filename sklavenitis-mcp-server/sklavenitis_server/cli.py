@@ -1,17 +1,17 @@
-"""Command-line interface for Sklavenitis MCP server."""
+"""CLI entry point."""
 
 import asyncio
 import sys
 
 
 def main() -> None:
-    """Run the Sklavenitis MCP server."""
+    """Main CLI entry point."""
     from .server import main as server_main
 
     try:
         asyncio.run(server_main())
     except KeyboardInterrupt:
-        print("\nShutting down Sklavenitis MCP server...", file=sys.stderr)
+        print("\nShutting down...", file=sys.stderr)
         sys.exit(0)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -20,3 +20,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
