@@ -41,16 +41,16 @@ class SklavenitisClient:
     async def login(self, email: str, password: str) -> bool:
         """
         Login to Sklavenitis.
-        
+
         Note: This may fail due to reCAPTCHA enforcement. If it fails,
         users should extract cookies manually from their browser.
         """
         logger.info(f"Attempting login for {email}")
-        
+
         try:
             # Step 1: Visit homepage to establish session
             self.session.get(f"{self.BASE_URL}/")
-            
+
             # Step 2: Get login form for CSRF token
             response = self.session.get(
                 f"{self.BASE_URL}/gr/ajax/Atcom.Sites.Yoda.Components.UserFlow.LoginUserFlow.Index/",
@@ -59,19 +59,19 @@ class SklavenitisClient:
                     "X-Requested-With": "XMLHttpRequest",
                 },
             )
-            
+
             # Extract CSRF token
             csrf_match = re.search(
                 r'name=["\']__RequestVerificationToken["\'][^>]*value=["\']([^"\']+)["\']',
                 response.text
             )
-            
+
             if not csrf_match:
                 logger.error("Could not extract CSRF token")
                 return False
-            
+
             csrf_token = csrf_match.group(1)
-            
+
             # Step 3: Submit login
             login_response = self.session.post(
                 f"{self.BASE_URL}/gr/ajax/Atcom.Sites.Yoda.Components.UserFlow.LoginUserFlow.Index/",
@@ -91,10 +91,10 @@ class SklavenitisClient:
                     "X-Requested-With": "XMLHttpRequest",
                 },
             )
-            
+
             # Check for auth cookie
             has_auth = any(".AspNet.ApplicationCookie" in name for name in self.session.cookies.keys())
-            
+
             if has_auth:
                 logger.info("✓ Login successful")
                 self._save_cookies()
@@ -104,7 +104,7 @@ class SklavenitisClient:
                 logger.info("This may be due to reCAPTCHA enforcement")
                 logger.info("Try extracting cookies manually from your browser")
                 return False
-                
+
         except Exception as e:
             logger.error(f"Login error: {e}", exc_info=True)
             return False

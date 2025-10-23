@@ -15,7 +15,7 @@ class AuthManager:
     def __init__(self, session_file: Optional[str] = None) -> None:
         """
         Initialize auth manager.
-        
+
         Args:
             session_file: Path to session file (default: ~/.sklavenitis_session.json)
         """
@@ -39,7 +39,7 @@ class AuthManager:
                         return
             except Exception as e:
                 logger.warning(f"Could not load session: {e}")
-        
+
         # Try legacy cookie file for backward compatibility
         legacy_file = str(Path.home() / ".sklavenitis_cookies.json")
         if os.path.exists(legacy_file):
@@ -58,7 +58,7 @@ class AuthManager:
         """Save session cookies to file."""
         self.cookies = cookies
         self.is_authenticated = bool(cookies)
-        
+
         try:
             with open(self.session_file, 'w') as f:
                 json.dump({"cookies": cookies}, f, indent=2)

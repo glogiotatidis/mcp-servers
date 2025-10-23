@@ -29,7 +29,7 @@ async def ensure_authenticated() -> bool:
     """Ensure client is authenticated, auto-login if needed."""
     if auth_manager.is_authenticated:
         return True
-    
+
     # Try to auto-login with stored credentials
     if credentials:
         email, password = credentials
@@ -44,7 +44,7 @@ async def ensure_authenticated() -> bool:
                 logger.warning("Please login manually via your browser and extract cookies")
         except Exception as e:
             logger.error(f"Auto-login error: {e}")
-    
+
     return False
 
 
@@ -52,7 +52,7 @@ async def ensure_authenticated() -> bool:
 async def list_resources() -> list[Resource]:
     """List available resources."""
     resources = []
-    
+
     if auth_manager.is_authenticated:
         resources.append(
             Resource(
@@ -62,7 +62,7 @@ async def list_resources() -> list[Resource]:
                 description="Current shopping cart contents",
             )
         )
-    
+
     return resources
 
 
@@ -70,14 +70,14 @@ async def list_resources() -> list[Resource]:
 async def read_resource(uri: AnyUrl) -> str:
     """Read a resource by URI."""
     uri_str = str(uri)
-    
+
     if uri_str == "sklavenitis://cart":
         if not auth_manager.is_authenticated:
             return "Error: Not authenticated. Please login first."
-        
+
         cart = client.get_cart()
         return cart.model_dump_json(indent=2)
-    
+
     raise ValueError(f"Unknown resource: {uri}")
 
 
@@ -155,7 +155,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         if name == "sklavenitis_login":
             email = arguments.get("email")
             password = arguments.get("password")
-            
+
             # Use provided credentials or fall back to environment
             if not email or not password:
                 if credentials:
@@ -168,9 +168,9 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                             text="Error: No credentials provided and SKLAVENITIS_EMAIL/SKLAVENITIS_PASSWORD not configured.",
                         )
                     ]
-            
+
             success = await client.login(email, password)
-            
+
             if success:
                 return [
                     TextContent(
@@ -190,30 +190,30 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                              "4. Try again - the server will use those cookies automatically",
                     )
                 ]
-        
+
         elif name == "sklavenitis_logout":
             client.logout()
             return [TextContent(type="text", text="✅ Successfully logged out")]
-        
+
         elif name == "sklavenitis_search_products":
             query = arguments.get("query")
             if not query:
                 return [TextContent(type="text", text="Error: Query parameter required")]
-            
+
             products = client.search_products(query)
-            
+
             if not products:
                 return [TextContent(type="text", text=f"No products found for: {query}")]
-            
+
             result_lines = [f"Found {len(products)} product(s):\n"]
             for i, product in enumerate(products, 1):
                 result_lines.append(f"\n{i}. {product.name}")
                 result_lines.append(f"   SKU: {product.id}")
                 if product.description:
                     result_lines.append(f"   Category: {product.description}")
-            
+
             return [TextContent(type="text", text="\n".join(result_lines))]
-        
+
         elif name == "sklavenitis_add_to_cart":
             # Ensure authenticated
             if not await ensure_authenticated():
@@ -224,12 +224,12 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                              "or use sklavenitis_login first.",
                     )
                 ]
-            
+
             product_sku = arguments["product_sku"]
             quantity = arguments.get("quantity", 1)
-            
+
             success = client.add_to_cart(product_sku, quantity)
-            
+
             if success:
                 return [
                     TextContent(
@@ -245,7 +245,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                         text=f"❌ Failed to add product {product_sku} to cart",
                     )
                 ]
-        
+
         elif name == "sklavenitis_get_cart":
             # Ensure authenticated
             if not await ensure_authenticated():
@@ -256,27 +256,27 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                              "or use sklavenitis_login first.",
                     )
                 ]
-            
+
             cart = client.get_cart()
-            
+
             if int(cart.summary_text) == 0:
                 return [TextContent(type="text", text="Your cart is empty")]
-            
+
             result_lines = [f"Shopping Cart ({cart.summary_text} items):\n"]
             result_lines.append(f"Total: {cart.grand_total}")
             if cart.slot_info:
                 result_lines.append(f"Delivery: {cart.slot_info}")
-            
+
             if cart.items:
                 result_lines.append("\nItems:")
                 for sku, item in cart.items.items():
                     result_lines.append(f"  - SKU {sku}: Quantity {item.quantity}")
-            
+
             return [TextContent(type="text", text="\n".join(result_lines))]
-        
+
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
-    
+
     except Exception as e:
         logger.error(f"Error executing tool {name}: {e}", exc_info=True)
         return [
@@ -290,15 +290,15 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
 async def main() -> None:
     """Main entry point."""
     global auth_manager, client, credentials
-    
+
     # Initialize auth manager and client
     auth_manager = AuthManager()
     client = SklavenitisClient(auth_manager)
-    
+
     # Load credentials from environment
     email = os.environ.get("SKLAVENITIS_EMAIL")
     password = os.environ.get("SKLAVENITIS_PASSWORD")
-    
+
     if email and password:
         credentials = (email, password)
         logger.info(f"Credentials loaded from environment for: {email}")
@@ -307,12 +307,12 @@ async def main() -> None:
             "No credentials found in environment variables (SKLAVENITIS_EMAIL, SKLAVENITIS_PASSWORD)"
         )
         logger.warning("You can login manually via sklavenitis_login tool")
-    
+
     logger.info("Starting Sklavenitis MCP Server...")
-    
+
     # Import and run the server
     from mcp.server.stdio import stdio_server
-    
+
     async with stdio_server() as (read_stream, write_stream):
         await app.run(
             read_stream,
