@@ -1,0 +1,17 @@
+{
+    "mcpServers": {
+        "sklavenitis": {
+            "type": "stdio",
+            "command": "/Users/giorgos/sklavenitis/sklavenitis-mcp-server/.venv/bin/python",
+            "args": [
+                "-m",
+                "sklavenitis_server"
+            ],
+            "env": {
+                "SKLAVENITIS_EMAIL": "your-email@example.com",
+                "SKLAVENITIS_PASSWORD": "your-password",
+                "SKLAVENITIS_ZIPCODE": "11141"
+            }
+        }
+    }
+}

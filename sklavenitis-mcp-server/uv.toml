@@ -1,0 +1,5 @@
+[pip]
+index-url = "https://pypi.org/simple"
+extra-index-url = []
+# Override global config to only use PyPI for this project
+

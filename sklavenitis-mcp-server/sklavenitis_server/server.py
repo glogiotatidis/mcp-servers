@@ -123,7 +123,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="sklavenitis_add_to_cart",
-            description="Add product to cart (auto-selects next-day 7-9am delivery slot)",
+            description="Add product to cart (auto-selects first available delivery slot, verifies addition)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -144,6 +144,20 @@ async def list_tools() -> list[Tool]:
             name="sklavenitis_get_cart",
             description="Get current shopping cart contents",
             inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="sklavenitis_remove_from_cart",
+            description="Remove product from cart",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "product_sku": {
+                        "type": "string",
+                        "description": "Product SKU to remove",
+                    },
+                },
+                "required": ["product_sku"],
+            },
         ),
     ]
 
@@ -231,18 +245,22 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             success = client.add_to_cart(product_sku, quantity)
 
             if success:
+                # Get updated cart to show delivery info
+                cart = client.get_cart()
+                delivery_info = cart.slot_info if cart.slot_info else "Not set"
+
                 return [
                     TextContent(
                         type="text",
                         text=f"✅ Successfully added product {product_sku} (quantity: {quantity}) to cart\n"
-                             f"Delivery slot: Tomorrow 7:00-9:00 AM",
+                             f"Delivery slot: {delivery_info}",
                     )
                 ]
             else:
                 return [
                     TextContent(
                         type="text",
-                        text=f"❌ Failed to add product {product_sku} to cart",
+                        text=f"❌ Failed to add product {product_sku} to cart (may be out of stock or unavailable)",
                     )
                 ]
 
@@ -274,6 +292,35 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
 
             return [TextContent(type="text", text="\n".join(result_lines))]
 
+        elif name == "sklavenitis_remove_from_cart":
+            # Ensure authenticated
+            if not await ensure_authenticated():
+                return [
+                    TextContent(
+                        type="text",
+                        text="Error: Not authenticated. Please configure SKLAVENITIS_EMAIL and SKLAVENITIS_PASSWORD, "
+                             "or use sklavenitis_login first.",
+                    )
+                ]
+
+            product_sku = arguments["product_sku"]
+            success = client.remove_from_cart(product_sku)
+
+            if success:
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"✅ Successfully removed product {product_sku} from cart",
+                    )
+                ]
+            else:
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"❌ Failed to remove product {product_sku} from cart (may not be in cart)",
+                    )
+                ]
+
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
@@ -291,13 +338,14 @@ async def main() -> None:
     """Main entry point."""
     global auth_manager, client, credentials
 
-    # Initialize auth manager and client
-    auth_manager = AuthManager()
-    client = SklavenitisClient(auth_manager)
-
-    # Load credentials from environment
+    # Load configuration from environment
     email = os.environ.get("SKLAVENITIS_EMAIL")
     password = os.environ.get("SKLAVENITIS_PASSWORD")
+    zipcode = os.environ.get("SKLAVENITIS_ZIPCODE")
+
+    # Initialize auth manager and client
+    auth_manager = AuthManager(zipcode=zipcode)
+    client = SklavenitisClient(auth_manager)
 
     if email and password:
         credentials = (email, password)
@@ -307,6 +355,11 @@ async def main() -> None:
             "No credentials found in environment variables (SKLAVENITIS_EMAIL, SKLAVENITIS_PASSWORD)"
         )
         logger.warning("You can login manually via sklavenitis_login tool")
+
+    if zipcode:
+        logger.info(f"Zipcode/HubID configured: {zipcode}")
+    else:
+        logger.info("No zipcode configured (SKLAVENITIS_ZIPCODE). Using default or saved Zone cookie.")
 
     logger.info("Starting Sklavenitis MCP Server...")
 

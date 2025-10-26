@@ -12,19 +12,22 @@ logger = logging.getLogger(__name__)
 class AuthManager:
     """Manages authentication state and session persistence."""
 
-    def __init__(self, session_file: Optional[str] = None) -> None:
+    def __init__(self, session_file: Optional[str] = None, zipcode: Optional[str] = None) -> None:
         """
         Initialize auth manager.
 
         Args:
             session_file: Path to session file (default: ~/.sklavenitis_session.json)
+            zipcode: Postal code for delivery zone (sets HubID)
         """
         if session_file is None:
             session_file = str(Path.home() / ".sklavenitis_session.json")
         self.session_file = session_file
+        self.zipcode = zipcode
         self.cookies: dict[str, str] = {}
         self.is_authenticated = False
         self._load_session()
+        self._set_zone_cookie()
 
     def _load_session(self) -> None:
         """Load saved session from file."""
@@ -81,4 +84,40 @@ class AuthManager:
     def get_cookies(self) -> dict[str, str]:
         """Get current session cookies."""
         return self.cookies
+
+    def _set_zone_cookie(self) -> None:
+        """Set Zone cookie based on zipcode/HubID."""
+        if not self.zipcode:
+            return
+
+        # Map zipcode ranges to HubIDs
+        # For now, we'll use the zipcode directly as HubID if it's numeric
+        # Users can customize this mapping as needed
+        hub_id = self._get_hub_id_from_zipcode(self.zipcode)
+
+        if hub_id:
+            zone_value = json.dumps({"ShippingType": 1, "HubID": hub_id})
+            self.cookies["Zone"] = zone_value
+            logger.info(f"Set Zone cookie for HubID {hub_id} (zipcode: {self.zipcode})")
+
+    def _get_hub_id_from_zipcode(self, zipcode: str) -> Optional[int]:
+        """
+        Map zipcode to HubID.
+
+        For now, if zipcode is a number, use it as HubID directly.
+        Users can extend this method to add custom zipcode->HubID mappings.
+        """
+        try:
+            # If it's already a HubID number, use it directly
+            return int(zipcode)
+        except ValueError:
+            # Could add custom zipcode mappings here, e.g.:
+            # zipcode_map = {
+            #     "10430": 11141,  # Example mapping
+            #     "15231": 11141,  # Example mapping
+            #     # ... more mappings
+            # }
+            # return zipcode_map.get(zipcode)
+            logger.warning(f"Could not parse zipcode/HubID: {zipcode}")
+            return None
 

@@ -29,12 +29,14 @@ Set your credentials as environment variables:
 ```bash
 export SKLAVENITIS_EMAIL="your.email@example.com"
 export SKLAVENITIS_PASSWORD="your_password"
+export SKLAVENITIS_ZIPCODE="11141"  # Optional: HubID for your delivery area
 ```
 
 The server will:
 1. Try to login automatically with these credentials
 2. Save session cookies to `~/.sklavenitis_session.json`
 3. Reuse saved cookies on subsequent runs (no re-login needed)
+4. Set the delivery zone based on your zipcode/HubID if provided
 
 ### Method 2: Manual Cookie Extraction (Fallback)
 
@@ -49,7 +51,7 @@ If automatic login fails due to reCAPTCHA:
   ".AspNet.ApplicationCookie_Frontend4": "YOUR_COOKIE_HERE",
   "__RequestVerificationToken": "YOUR_TOKEN_HERE",
   "StoreSID": "YOUR_STORE_SID_HERE",
-  "Zone": "{\"ShippingType\":1,\"HubID\":9}"
+  "Zone": "{\"ShippingType\":1,\"HubID\":11141}"
 }
 ```
 
@@ -76,12 +78,48 @@ Add to `claude_desktop_config.json`:
       "cwd": "/path/to/sklavenitis-mcp-server",
       "env": {
         "SKLAVENITIS_EMAIL": "your.email@example.com",
-        "SKLAVENITIS_PASSWORD": "your_password"
+        "SKLAVENITIS_PASSWORD": "your_password",
+        "SKLAVENITIS_ZIPCODE": "11141"
       }
     }
   }
 }
 ```
+
+### Using with Cursor
+
+1. First, make sure the package is installed:
+```bash
+cd /path/to/sklavenitis-mcp-server
+uv pip install -e .
+```
+
+2. Open Cursor Settings (Cmd+Shift+J or Ctrl+Shift+J)
+3. Click on "MCP" in the sidebar
+4. Click "Add MCP Server" or edit your configuration
+5. Add the following configuration (replace with your actual paths and credentials):
+
+```json
+{
+  "mcpServers": {
+    "sklavenitis": {
+      "type": "stdio",
+      "command": "/full/path/to/sklavenitis-mcp-server/.venv/bin/python",
+      "args": ["-m", "sklavenitis_server"],
+      "env": {
+        "SKLAVENITIS_EMAIL": "your-email@example.com",
+        "SKLAVENITIS_PASSWORD": "your-password",
+        "SKLAVENITIS_ZIPCODE": "11141"
+      }
+    }
+  }
+}
+```
+
+**Important:**
+- Use the **full absolute path** to your `.venv/bin/python`
+- Make sure the package is installed with `uv pip install -e .`
+- Restart Cursor after adding the configuration
 
 ## Available Tools
 
@@ -102,6 +140,12 @@ Add product to cart with automatic delivery slot selection (next day 7-9am).
 View current shopping cart contents.
 
 **Parameters:** None
+
+### `sklavenitis_remove_from_cart`
+Remove product from cart.
+
+**Parameters:**
+- `product_sku` (required): Product SKU to remove
 
 ### `sklavenitis_login`
 Manually trigger login (usually not needed - happens automatically).
@@ -141,6 +185,11 @@ Delivery: Friday 24/10/2025, 07:00 - 09:00
 
 Items:
   - SKU 1631417: Quantity 1.00
+
+User: Remove that product
+Claude: [Uses sklavenitis_remove_from_cart with product_sku="1631417"]
+
+✅ Successfully removed product 1631417 from cart
 ```
 
 ## Testing
@@ -174,9 +223,16 @@ This will:
 Adding to cart requires **2 steps** (both handled automatically):
 
 1. POST to add product (SKU + quantity)
-2. POST to select delivery slot (auto-selects next day 7-9am)
+   - If no delivery slot selected: Returns HTML with available slots
+   - If slot already selected: Returns JSON with success/error status
 
-If step 2 is skipped, items won't appear in cart - this is handled correctly by the client.
+2. POST to select delivery slot (only if needed)
+   - Automatically extracts first available slot from API response
+   - Skips this step if a slot is already selected
+
+3. Verifies product was added by checking cart contents
+
+The client handles both scenarios seamlessly and validates all additions.
 
 ## Troubleshooting
 
@@ -196,7 +252,8 @@ Delete `~/.sklavenitis_session.json` and the server will re-login automatically.
 
 - **HTTP Client:** curl-cffi with Chrome 120 impersonation
 - **Session Storage:** `~/.sklavenitis_session.json`
-- **Default Delivery:** Tomorrow 7:00-9:00 AM, Hub ID 9 (Athens area)
+- **Default Delivery:** Tomorrow 7:00-9:00 AM
+- **Delivery Zone:** Configurable via SKLAVENITIS_ZIPCODE (HubID)
 - **Language:** Greek (el-GR)
 
 ## License

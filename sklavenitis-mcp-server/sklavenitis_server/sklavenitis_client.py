@@ -147,16 +147,70 @@ class SklavenitisClient:
             logger.error(f"Search error: {e}")
             return []
 
+    def remove_from_cart(self, product_sku: str) -> bool:
+        """
+        Remove product from cart by setting quantity to 0.
+
+        Returns True if product was successfully removed.
+        """
+        logger.info(f"Removing product {product_sku} from cart")
+
+        try:
+            # Get cart before to verify product exists
+            cart_before = self.get_cart()
+            if not cart_before.items or product_sku not in cart_before.items:
+                logger.warning(f"Product {product_sku} not in cart")
+                return False
+
+            # Remove by setting quantity to 0
+            response = self.session.post(
+                f"{self.BASE_URL}/gr/ajax/Atcom.Sites.Yoda.Components.UserFlow.AddToCartUserFlow.Index/",
+                data={
+                    "Action": "Update",
+                    f"CartItems[0][ProductSKU]": product_sku,
+                    f"CartItems[0][Quantity]": "0",
+                },
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "X-UserFlow-New": "true",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Remove failed: {response.status_code}")
+                return False
+
+            # Verify removal
+            cart_after = self.get_cart()
+            if not cart_after.items or product_sku not in cart_after.items:
+                logger.info(f"✓ Product {product_sku} removed from cart")
+                return True
+            else:
+                logger.error(f"✗ Product {product_sku} still in cart after removal attempt")
+                return False
+
+        except Exception as e:
+            logger.error(f"Remove from cart error: {e}", exc_info=True)
+            return False
+
     def add_to_cart(self, product_sku: str, quantity: int = 1) -> bool:
         """
         Add product to cart with BOTH required steps:
         1. Add the product
-        2. Select delivery slot (required to finalize)
+        2. Select delivery slot (extracts first available from API response)
+
+        Verifies success by checking cart contents.
         """
         logger.info(f"Adding product {product_sku} to cart (qty: {quantity})")
 
         try:
-            # Step 1: Add product
+            # Get cart before to compare
+            cart_before = self.get_cart()
+            items_before = set(cart_before.items.keys()) if cart_before.items else set()
+
+            # Step 1: Add product - this returns available time slots
+            logger.info("Step 1: Adding product to cart...")
             response1 = self.session.post(
                 f"{self.BASE_URL}/gr/ajax/Atcom.Sites.Yoda.Components.UserFlow.AddToCartUserFlow.Index/",
                 data={
@@ -171,35 +225,87 @@ class SklavenitisClient:
                 },
             )
 
+            logger.info(f"Step 1 response: {response1.status_code}")
             if response1.status_code != 200:
-                logger.error(f"Step 1 failed: {response1.status_code}")
+                logger.error(f"Step 1 HTTP error: {response1.status_code}")
                 return False
 
-            # Step 2: Select delivery slot (tomorrow 7:00-9:00)
-            tomorrow = datetime.now() + timedelta(days=1)
-            slot_start = tomorrow.replace(hour=7, minute=0, second=0)
-            slot_end = tomorrow.replace(hour=9, minute=0, second=0)
+            # Check if response is JSON (slot already selected) or HTML (need to select slot)
+            content_type = response1.headers.get('Content-Type', '')
 
-            response2 = self.session.post(
-                f"{self.BASE_URL}/gr/ajax/Atcom.Sites.Yoda.Components.UserFlow.AddToCartUserFlow.Index/",
-                data={
-                    "TimeSlotDate": slot_start.strftime("%Y-%m-%d %H:%M:%S"),
-                    "TimeSlotDateTo": slot_end.strftime("%Y-%m-%d %H:%M:%S"),
-                    "RequiresNotification": "False",
-                },
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    "X-NoRedirect": "true",
-                    "X-Requested-With": "XMLHttpRequest",
-                },
-            )
+            if 'application/json' in content_type:
+                # Slot already selected - product added directly
+                logger.info("Step 2: Slot already selected, product added directly")
+                try:
+                    result = response1.json()
+                    result_code = result.get('Result')
 
-            if response2.status_code != 200:
-                logger.error(f"Step 2 failed: {response2.status_code}")
+                    # Result codes: 2=success, 4=out of stock or other error
+                    if result_code == 2 and result.get('UpdateCart'):
+                        logger.info(f"✓ Product added successfully (Result={result_code})")
+                    elif result_code == 4:
+                        logger.error(f"Product not available (Result={result_code}, possibly out of stock)")
+                        return False
+                    else:
+                        logger.warning(f"Unexpected result code: {result_code}, response: {result}")
+                except Exception as e:
+                    logger.error(f"Failed to parse JSON response: {e}")
+            else:
+                # Need to select delivery slot
+                logger.info("Step 2: Extracting first available delivery slot...")
+                html = response1.text
+
+                # Look for first available slot: data-starttime="..." data-endtime="..."
+                start_match = re.search(r'data-starttime="([^"]+)"', html)
+                end_match = re.search(r'data-endtime="([^"]+)"', html)
+
+                if not start_match or not end_match:
+                    logger.error("Could not extract delivery slot from response")
+                    logger.debug(f"Response snippet: {html[:500]}")
+                    return False
+
+                slot_start = start_match.group(1)
+                slot_end = end_match.group(1)
+                logger.info(f"Found available slot: {slot_start} to {slot_end}")
+
+                # Step 3: Confirm the delivery slot
+                logger.info("Step 3: Confirming delivery slot...")
+                response2 = self.session.post(
+                    f"{self.BASE_URL}/gr/ajax/Atcom.Sites.Yoda.Components.UserFlow.AddToCartUserFlow.Index/",
+                    data={
+                        "TimeSlotDate": slot_start,
+                        "TimeSlotDateTo": slot_end,
+                        "RequiresNotification": "False",
+                    },
+                    headers={
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                        "X-NoRedirect": "true",
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                )
+
+                logger.info(f"Step 3 response: {response2.status_code}")
+                if response2.status_code != 200:
+                    logger.error(f"Step 3 HTTP error: {response2.status_code}")
+                    return False
+
+            # Final step: VERIFY by checking cart
+            logger.info("Final step: Verifying cart contents...")
+            cart_after = self.get_cart()
+            items_after = set(cart_after.items.keys()) if cart_after.items else set()
+
+            # Check if product was actually added
+            if product_sku in items_after:
+                logger.info(f"✓ Product {product_sku} verified in cart")
+                return True
+            elif len(items_after) > len(items_before):
+                logger.info(f"✓ Cart size increased (new items: {items_after - items_before})")
+                return True
+            else:
+                logger.error(f"✗ Product NOT found in cart after add attempt")
+                logger.error(f"Cart before: {items_before}")
+                logger.error(f"Cart after: {items_after}")
                 return False
-
-            logger.info("✓ Product added to cart successfully")
-            return True
 
         except Exception as e:
             logger.error(f"Add to cart error: {e}", exc_info=True)
