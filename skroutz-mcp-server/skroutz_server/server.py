@@ -147,7 +147,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "product_id": {
                         "type": "string",
-                        "description": "Product ID to add to cart",
+                        "description": "Product URL (from search results) or Product ID to add to cart",
                     },
                     "quantity": {
                         "type": "integer",

@@ -57,9 +57,9 @@ python -m skroutz_server.cli --mode http --reload
 
 ## Configuration for MCP Clients
 
-### Cursor/Claude Desktop
+### Cursor
 
-Add to `~/.cursor/mcp.json` or `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Add to `~/.cursor/mcp.json`:
 
 ```json
 {
@@ -68,23 +68,66 @@ Add to `~/.cursor/mcp.json` or `~/Library/Application Support/Claude/claude_desk
       "command": "python",
       "args": ["-m", "skroutz_server"],
       "env": {
-        "SKROUTZ_EMAIL": "your@email.com",
-        "SKROUTZ_PASSWORD": "your-password"
+        "SKROUTZ_HELMET_COUCH": "your_helmet_couch_value_here",
+        "SKROUTZ_CF_CLEARANCE": "your_cf_clearance_value_here",
+        "SKROUTZ_DD": "your_dd_value_here"
       }
     }
   }
 }
 ```
 
-Or with Docker:
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "skroutz": {
+      "command": "python",
+      "args": ["-m", "skroutz_server"],
+      "env": {
+        "SKROUTZ_HELMET_COUCH": "your_helmet_couch_value_here",
+        "SKROUTZ_CF_CLEARANCE": "your_cf_clearance_value_here",
+        "SKROUTZ_DD": "your_dd_value_here"
+      }
+    }
+  }
+}
+```
+
+### Claude Code
+
+For Claude Code with virtual environment:
+
+```json
+{
+  "mcpServers": {
+    "skroutz": {
+      "command": "/full/path/to/.venv/bin/python",
+      "args": ["-m", "skroutz_server"],
+      "env": {
+        "SKROUTZ_HELMET_COUCH": "your_helmet_couch_value_here",
+        "SKROUTZ_CF_CLEARANCE": "your_cf_clearance_value_here",
+        "SKROUTZ_DD": "your_dd_value_here"
+      }
+    }
+  }
+}
+```
+
+### Docker
+
 ```json
 {
   "mcpServers": {
     "skroutz": {
       "command": "docker",
       "args": ["run", "-i", "--rm",
-               "-e", "SKROUTZ_EMAIL=your@email.com",
-               "-e", "SKROUTZ_PASSWORD=your-password",
+               "-e", "SKROUTZ_HELMET_COUCH=your_value",
+               "-e", "SKROUTZ_CF_CLEARANCE=your_value",
+               "-e", "SKROUTZ_DD=your_value",
                "skroutz-mcp-server"]
     }
   }
